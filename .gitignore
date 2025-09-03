@@ -1,0 +1,6 @@
+# Ignore the environment file
+pass.env
+
+# Ignore the frontend files
+index.html
+/models/

@@ -1,4 +1,4 @@
-# app.py (Final Version with All Fixes and Logging)
+# app.py (Edited for Render Deployment)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -17,10 +17,6 @@ from textblob import TextBlob
 import collections
 import time
 import os
-from dotenv import load_dotenv
-
-dotenv_path = r"C:\Users\91914\OneDrive\Desktop\wbs\pass.env"
-load_dotenv(dotenv_path=dotenv_path)
 
 # --- 1. INITIALIZE THE FLASK APP ---
 app = Flask(__name__)
@@ -57,9 +53,10 @@ def get_text_sentiment(text):
     else: return "Neutral"
 
 def get_gemini_response(prompt):
-    apiKey = os.getenv("GEMINI_API_KEY")
+    # RENDER CHANGE: This will now read the key from Render's environment variables
+    apiKey = os.getenv("GEMINI_API_KEY") 
     if not apiKey:
-        print("Error: GEMINI_API_KEY could not be loaded. Check your .env file.")
+        print("Error: GEMINI_API_KEY environment variable not set on the server.")
         return "I'm sorry, my connection to my core systems is not configured correctly."
         
     apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={apiKey}"
@@ -75,7 +72,8 @@ def get_gemini_response(prompt):
         return "I'm having a little trouble connecting right now."
 
 # --- 5. API ENDPOINTS ---
-
+# All your endpoints (@app.route) remain exactly the same.
+# ...
 @app.route('/status', methods=['GET'])
 def status():
     return jsonify({'status': 'ready', 'message': 'Aura AI is online.'})
@@ -83,7 +81,7 @@ def status():
 @app.route('/predict_and_trigger', methods=['POST'])
 def predict_and_trigger():
     global last_interaction_time, conversation_history, is_ai_turn
-
+    # ... (code inside this function is unchanged) ...
     data = request.get_json()
     image_data = base64.b64decode(data['image'].split(',')[1])
     image = Image.open(io.BytesIO(image_data))
@@ -97,7 +95,6 @@ def predict_and_trigger():
 
     ai_response = None
     current_time = time.time()
-    
     prompt = None
     if not is_ai_turn and (current_time - last_interaction_time > INITIAL_EMOTION_COOLDOWN):
         if len(emotion_history) == 3 and len(set(emotion_history)) == 1:
@@ -111,7 +108,6 @@ def predict_and_trigger():
                 prompt = emotion_prompts.get(trigger_emotion)
                 if prompt:
                     print(f"--- Proactive chat triggered by EMOTION: {trigger_emotion} ---")
-
     elif is_ai_turn and (current_time - last_interaction_time > IDLE_TIMEOUT):
         last_emotion = emotion_history[-1]
         prompt = (f"The user hasn't replied for 30 seconds. Their current facial emotion is '{last_emotion}'. "
@@ -129,46 +125,34 @@ def predict_and_trigger():
 
     return jsonify({'emotion': emotion_label, 'ai_response': ai_response})
 
-
 @app.route('/chat', methods=['POST'])
 def chat_endpoint():
     global conversation_history, is_ai_turn, last_interaction_time
-    
-    # NEW: Add print statements for debugging
+    # ... (code inside this function is unchanged) ...
     print("\n--- Received request in /chat endpoint ---")
     data = request.get_json()
     print(f"Raw data received: {data}")
-
     user_message = data.get('message', '')
     print(f"Extracted user message: '{user_message}'")
-    
     facial_emotion = data.get('emotion', 'Neutral')
     text_sentiment = get_text_sentiment(user_message)
-    
     conversation_history.append({"user": user_message})
     if len(conversation_history) > 4:
         conversation_history.pop(0)
-
     prompt = (f"Continue this conversation. The user's current facial emotion is '{facial_emotion}'. "
               f"The sentiment of their words is '{text_sentiment}'. "
               f"Recent conversation history: {json.dumps(conversation_history)}. "
               f"The user just said: '{user_message}'. Respond thoughtfully.")
-    
     print(f"Prompt sent to Gemini: {prompt}")
-              
     ai_response = get_gemini_response(prompt)
-    
     conversation_history.append({"ai": ai_response})
     if len(conversation_history) > 4:
         conversation_history.pop(0)
-
     last_interaction_time = time.time()
     is_ai_turn = True 
-
     return jsonify({'reply': ai_response})
-
 
 # --- 6. RUN THE APP ---
 if __name__ == '__main__':
-    # THE CRUCIAL FIX: Disable the reloader to stabilize global variables
-    app.run(debug=True, use_reloader=False, port=5000)
+    # RENDER CHANGE: This is the standard way to run a Flask app in production
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
