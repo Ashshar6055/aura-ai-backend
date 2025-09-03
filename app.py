@@ -1,4 +1,4 @@
-# app.py (Final Version with All Fixes and Logging)
+# app.py (Final Version for Deployment)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -17,14 +17,11 @@ from textblob import TextBlob
 import collections
 import time
 import os
-from dotenv import load_dotenv
-
-dotenv_path = r"C:\Users\91914\OneDrive\Desktop\wbs\pass.env"
-load_dotenv(dotenv_path=dotenv_path)
 
 # --- 1. INITIALIZE THE FLASK APP ---
 app = Flask(__name__)
-CORS(app)
+# This will be updated with a specific URL for the final deployment
+CORS(app) 
 
 # --- 2. LOAD THE AI MODEL ONCE AT STARTUP ---
 print("Loading AI model...")
@@ -41,10 +38,10 @@ print("Model loaded successfully! Server is ready.")
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
 # --- 3. CONVERSATION STATE ---
-emotion_history = collections.deque(maxlen=3) 
+emotion_history = collections.deque(maxlen=3)
 conversation_history = []
 last_interaction_time = time.time()
-is_ai_turn = False 
+is_ai_turn = False
 
 INITIAL_EMOTION_COOLDOWN = 5
 IDLE_TIMEOUT = 30
@@ -52,16 +49,20 @@ IDLE_TIMEOUT = 30
 # --- 4. HELPER FUNCTIONS ---
 def get_text_sentiment(text):
     analysis = TextBlob(text)
-    if analysis.sentiment.polarity > 0.2: return "Positive"
-    elif analysis.sentiment.polarity < -0.2: return "Negative"
-    else: return "Neutral"
+    if analysis.sentiment.polarity > 0.2:
+        return "Positive"
+    elif analysis.sentiment.polarity < -0.2:
+        return "Negative"
+    else:
+        return "Neutral"
 
 def get_gemini_response(prompt):
+    # RENDER CHANGE: This will now read the key from Render's environment variables
     apiKey = os.getenv("GEMINI_API_KEY")
     if not apiKey:
-        print("Error: GEMINI_API_KEY could not be loaded. Check your .env file.")
+        print("Error: GEMINI_API_KEY environment variable not set on the server.")
         return "I'm sorry, my connection to my core systems is not configured correctly."
-        
+    
     apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={apiKey}"
     headers = {"Content-Type": "application/json"}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -75,7 +76,6 @@ def get_gemini_response(prompt):
         return "I'm having a little trouble connecting right now."
 
 # --- 5. API ENDPOINTS ---
-
 @app.route('/status', methods=['GET'])
 def status():
     return jsonify({'status': 'ready', 'message': 'Aura AI is online.'})
@@ -97,8 +97,8 @@ def predict_and_trigger():
 
     ai_response = None
     current_time = time.time()
-    
     prompt = None
+
     if not is_ai_turn and (current_time - last_interaction_time > INITIAL_EMOTION_COOLDOWN):
         if len(emotion_history) == 3 and len(set(emotion_history)) == 1:
             trigger_emotion = emotion_history[0]
@@ -113,7 +113,7 @@ def predict_and_trigger():
                     print(f"--- Proactive chat triggered by EMOTION: {trigger_emotion} ---")
 
     elif is_ai_turn and (current_time - last_interaction_time > IDLE_TIMEOUT):
-        last_emotion = emotion_history[-1]
+        last_emotion = emotion_history[-1] if emotion_history else 'Neutral'
         prompt = (f"The user hasn't replied for 30 seconds. Their current facial emotion is '{last_emotion}'. "
                   f"Gently continue the conversation or ask a follow-up question. "
                   f"Recent history: {json.dumps(conversation_history)}")
@@ -129,19 +129,12 @@ def predict_and_trigger():
 
     return jsonify({'emotion': emotion_label, 'ai_response': ai_response})
 
-
 @app.route('/chat', methods=['POST'])
 def chat_endpoint():
     global conversation_history, is_ai_turn, last_interaction_time
     
-    # NEW: Add print statements for debugging
-    print("\n--- Received request in /chat endpoint ---")
     data = request.get_json()
-    print(f"Raw data received: {data}")
-
     user_message = data.get('message', '')
-    print(f"Extracted user message: '{user_message}'")
-    
     facial_emotion = data.get('emotion', 'Neutral')
     text_sentiment = get_text_sentiment(user_message)
     
@@ -153,8 +146,6 @@ def chat_endpoint():
               f"The sentiment of their words is '{text_sentiment}'. "
               f"Recent conversation history: {json.dumps(conversation_history)}. "
               f"The user just said: '{user_message}'. Respond thoughtfully.")
-    
-    print(f"Prompt sent to Gemini: {prompt}")
               
     ai_response = get_gemini_response(prompt)
     
@@ -167,8 +158,7 @@ def chat_endpoint():
 
     return jsonify({'reply': ai_response})
 
-
 # --- 6. RUN THE APP ---
 if __name__ == '__main__':
-    # THE CRUCIAL FIX: Disable the reloader to stabilize global variables
-    app.run(debug=True, use_reloader=False, port=5000)
+    # RENDER CHANGE: This is the standard way to run a Flask app in production
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
