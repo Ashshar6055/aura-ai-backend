@@ -1,18 +1,16 @@
 Core web server libraries
-Flask==3.0.0
-Flask-Cors==4.0.1
+Flask==3.1.2
+flask-cors==6.0.1
 gunicorn==22.0.0
-requests==2.31.0
+requests==2.32.5
 
 AI and Machine Learning libraries
 numpy==1.26.4
-opencv-python-headless==4.9.0.80
-Pillow==10.2.0
-
-This is the version compatible with Python 3.11
-tensorflow-cpu==2.15.0
+opencv-python-headless==4.11.0.86
+Pillow==11.3.0
+tensorflow-cpu==2.19.0
+h5py==3.14.0
 
 NLP and utility libraries
-textblob==0.18.0.post0
-python-dotenv==1.0.1
-h5py==3.11.0
+textblob==0.19.0
+python-dotenv==1.1.1
